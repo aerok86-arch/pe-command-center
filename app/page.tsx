@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 
 // ── 타입 ──────────────────────────────────────────────────────
 type Tab = 'radar' | 'ideas' | 'pipeline'
@@ -44,6 +45,7 @@ function Spinner() {
 // ── 메인 앱 ───────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab] = useState<Tab>('radar')
+  const { data: session } = useSession()
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 720, margin: '0 auto' }}>
@@ -76,7 +78,21 @@ export default function App() {
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
           <span style={{ fontSize: 13, fontWeight: 600 }}>PE Command Center</span>
         </div>
-        <span style={{ fontSize: 11, color: 'var(--text3)' }}>SV Investment</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>SV Investment</span>
+          {session?.user && (
+            <>
+              {session.user.image
+                ? <img src={session.user.image} alt="profile" style={{ width: 24, height: 24, borderRadius: '50%', border: '0.5px solid var(--border2)' }} />
+                : <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 600 }}>{session.user.name?.[0] ?? '?'}</div>
+              }
+              <button
+                onClick={() => signOut({ callbackUrl: '/login' })}
+                style={{ fontSize: 10, color: 'var(--text3)', background: 'transparent', border: '0.5px solid var(--border2)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontFamily: 'inherit' }}
+              >로그아웃</button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 탭 */}
