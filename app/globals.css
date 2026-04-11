@@ -1,0 +1,37 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f6f2;
+  --bg2: #ffffff;
+  --bg3: #f0eee8;
+  --text: #1a1917;
+  --text2: #6b6860;
+  --text3: #9e9b94;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --accent: #534AB7;
+  --accent-light: #EEEDFE;
+  --accent-hover: #3C3489;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141312;
+    --bg2: #1e1d1b;
+    --bg3: #252320;
+    --text: #f0ede8;
+    --text2: #9e9b94;
+    --text3: #6b6860;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --accent-light: #2a2660;
+  }
+}
+
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+
+button { cursor: pointer; font-family: inherit; border: none; }
+input, textarea, select { font-family: inherit; }
+a { color: inherit; text-decoration: none; }
