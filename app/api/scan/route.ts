@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
       max_tokens: 2000,
       tools: [{ type: 'web_search_20250305' as any, name: 'web_search' }],
       system: `PE 투자 운용역용 뉴스 분석 AI. 반드시 JSON만 출력:
-{"items":[{"headline":"제목(40자이내)","summary":"요약(2~3문장)","pe_implication":"PE시사점(2~3문장)","sentiment":"positive|negative|neutral","sector_tags":["섹터"],"urgency":"high|medium|low"}]}
-4~6개 항목. 실제 최신 뉴스 기반.`,
-      messages: [{ role: 'user', content: `키워드: ${keywords.join(', ')}\n최근 1~2주 뉴스 PE 관점 분석. JSON만.` }],
+{"items":[{"headline":"제목(40자이내)","summary":"요약(2~3문장)","pe_implication":"PE시사점(2~3문장)","sentiment":"positive|negative|neutral","sector_tags":["섹터"],"urgency":"high|medium|low","source":"출처 매체명(예:한국경제,블룸버그,Reuters)","url":"실제 기사 URL (없으면 빈 문자열)"}]}
+4~6개 항목. 실제 최신 뉴스 기반. web_search로 찾은 실제 기사의 출처와 URL을 반드시 포함할 것.`,
+      messages: [{ role: 'user', content: `키워드: ${keywords.join(', ')}\n최근 1~2주 뉴스 PE 관점 분석. 각 뉴스의 출처 매체명과 기사 URL을 포함하여 JSON만 출력.` }],
     })
 
     let txt = ''

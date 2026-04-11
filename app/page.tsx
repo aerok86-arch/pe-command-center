@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 // ── 타입 ──────────────────────────────────────────────────────
 type Tab = 'radar' | 'ideas' | 'pipeline'
-type NewsItem = { headline: string; summary: string; pe_implication: string; sentiment: string; sector_tags: string[]; urgency: string }
+type NewsItem = { headline: string; summary: string; pe_implication: string; sentiment: string; sector_tags: string[]; urgency: string; source?: string; url?: string }
 type Idea = { id: string; title: string; sector: string; stage: string; ev: string; thesis: string; nextAction: string; date: string; url: string }
 type Deal = { id: string; name: string; status: string; amount: number | null; type: string[]; sourcingType: string; sourcer: string; date: string; url: string }
 
@@ -86,11 +86,11 @@ export default function App() {
         ))}
       </div>
 
-      {/* 컨텐츠 */}
-      <div style={{ flex: 1, padding: 14, overflowY: 'auto' }}>
-        {tab === 'radar' && <NewsRadar />}
-        {tab === 'ideas' && <IdeaBank />}
-        {tab === 'pipeline' && <DealPipeline />}
+      {/* 컨텐츠 — 탭 전환 시 상태 유지를 위해 display:none 방식 사용 */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ display: tab === 'radar' ? 'block' : 'none', padding: 14 }}><NewsRadar /></div>
+        <div style={{ display: tab === 'ideas' ? 'block' : 'none', padding: 14 }}><IdeaBank /></div>
+        <div style={{ display: tab === 'pipeline' ? 'block' : 'none', padding: 14 }}><DealPipeline /></div>
       </div>
     </div>
   )
@@ -186,10 +186,22 @@ function NewsRadar() {
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 5, lineHeight: 1.5 }}>{n.headline}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 8 }}>{n.summary}</div>
-          <div style={{ fontSize: 12, color: '#3C3489', background: 'var(--accent-light)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: '#3C3489', background: 'var(--accent-light)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.6, marginBottom: n.source ? 7 : 0 }}>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', marginBottom: 3 }}>PE 시사점</div>
             {n.pe_implication}
           </div>
+          {n.source && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
+              <span style={{ fontSize: 10, color: 'var(--text3)' }}>출처</span>
+              {n.url ? (
+                <a href={n.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', borderBottom: '0.5px solid rgba(83,74,183,0.4)' }}>
+                  {n.source} ↗
+                </a>
+              ) : (
+                <span style={{ fontSize: 11, color: 'var(--text2)' }}>{n.source}</span>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -351,10 +363,26 @@ function IdeaBank() {
 }
 
 // ── DEAL PIPELINE ───────────────────────────────────────────────
+const DEAL_STATUSES = ['On-going', 'Closed', 'Drop']
+const DEAL_TYPES = ['PE', 'VC', 'M&A', 'IPO', 'Pre-IPO', '기타']
+const SOURCING_TYPES = ['직접소싱', 'IB소개', 'LP소개', '네트워크', '기타']
+
 function DealPipeline() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<string>('전체')
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('')
+  const [form, setForm] = useState({
+    name: '',
+    status: 'On-going',
+    amount: '',
+    type: [] as string[],
+    sourcingType: '',
+    sourcer: '',
+    date: new Date().toISOString().slice(0, 10),
+  })
 
   const loadDeals = useCallback(async () => {
     setLoading(true)
@@ -367,6 +395,39 @@ function DealPipeline() {
   }, [])
 
   useEffect(() => { loadDeals() }, [loadDeals])
+
+  const toggleType = (t: string) => setForm(p => ({
+    ...p,
+    type: p.type.includes(t) ? p.type.filter(x => x !== t) : [...p.type, t]
+  }))
+
+  const saveDeal = async () => {
+    if (!form.name.trim()) { alert('딜 이름을 입력해주세요.'); return }
+    setSaving(true); setSaveStatus('Notion에 저장 중...')
+    try {
+      const r = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          status: form.status,
+          amount: form.amount ? Number(form.amount) : null,
+          type: form.type,
+          sourcingType: form.sourcingType,
+          sourcer: form.sourcer,
+          date: form.date,
+        }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setSaveStatus('✓ 저장 완료')
+      setForm({ name: '', status: 'On-going', amount: '', type: [], sourcingType: '', sourcer: '', date: new Date().toISOString().slice(0, 10) })
+      setShowForm(false)
+      loadDeals()
+      setTimeout(() => setSaveStatus(''), 3000)
+    } catch (e: any) { setSaveStatus('오류: ' + e.message) }
+    finally { setSaving(false) }
+  }
 
   const statuses = ['전체', 'On-going', 'Closed', 'Drop']
   const filtered = filter === '전체' ? deals : deals.filter(d => d.status === filter)
@@ -386,19 +447,93 @@ function DealPipeline() {
         ))}
       </div>
 
+      {/* 필터 + 신규 추가 버튼 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div className="pe-row" style={{ gap: 5 }}>
           {statuses.map(s => (
             <div key={s} className={`pe-chip${filter === s ? ' sel' : ''}`} style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => setFilter(s)}>{s}</div>
           ))}
         </div>
-        <Btn variant="ghost" style={{ padding: '4px 9px', fontSize: 11 }} onClick={loadDeals}>↻</Btn>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Btn variant="ghost" style={{ padding: '4px 9px', fontSize: 11 }} onClick={loadDeals}>↻</Btn>
+          <Btn variant="primary" style={{ padding: '5px 11px', fontSize: 11 }} onClick={() => setShowForm(v => !v)}>
+            {showForm ? '✕ 닫기' : '+ 딜 추가'}
+          </Btn>
+        </div>
       </div>
+
+      {/* 신규 딜 입력 폼 */}
+      {showForm && (
+        <div className="pe-card" style={{ marginBottom: 14, border: '0.5px solid rgba(83,74,183,0.35)' }}>
+          <div className="pe-section" style={{ marginBottom: 11 }}>신규 딜 추가</div>
+
+          {/* 딜 이름 */}
+          <div style={{ marginBottom: 10 }}>
+            <div className="pe-label">딜 이름 *</div>
+            <input className="pe-input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="예: ABC 물류, XYZ 바이오" />
+          </div>
+
+          {/* 상태 + 딜 구분 */}
+          <div className="pe-grid2" style={{ marginBottom: 10 }}>
+            <div>
+              <div className="pe-label">딜 상태</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {DEAL_STATUSES.map(s => (
+                  <button key={s} className={`pe-stage-btn${form.status === s ? ' sel' : ''}`} onClick={() => setForm(p => ({ ...p, status: s }))}>{s}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="pe-label">소싱구분</div>
+              <select className="pe-input" value={form.sourcingType} onChange={e => setForm(p => ({ ...p, sourcingType: e.target.value }))}>
+                <option value="">선택</option>
+                {SOURCING_TYPES.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* 딜 구분 멀티셀렉트 */}
+          <div style={{ marginBottom: 10 }}>
+            <div className="pe-label">딜 구분 (복수 선택 가능)</div>
+            <div className="pe-row" style={{ gap: 5 }}>
+              {DEAL_TYPES.map(t => (
+                <div key={t} className={`pe-chip${form.type.includes(t) ? ' sel' : ''}`} style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => toggleType(t)}>{t}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* 금액 + 소싱자 */}
+          <div className="pe-grid2" style={{ marginBottom: 10 }}>
+            <div>
+              <div className="pe-label">딜 금액 (억원)</div>
+              <input className="pe-input" type="number" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="예: 500" />
+            </div>
+            <div>
+              <div className="pe-label">소싱자</div>
+              <input className="pe-input" value={form.sourcer} onChange={e => setForm(p => ({ ...p, sourcer: e.target.value }))} placeholder="예: 김OO" />
+            </div>
+          </div>
+
+          {/* 날짜 */}
+          <div style={{ marginBottom: 12 }}>
+            <div className="pe-label">날짜</div>
+            <input className="pe-input" type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+          </div>
+
+          <div className="pe-save-box">
+            <div className="pe-save-note">저장 즉시 Notion Deal Sheet에 자동 싱크됨</div>
+            <Btn onClick={saveDeal} disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
+              {saving ? <><Spinner /> 저장 중...</> : '💾 저장 + Notion 싱크'}
+            </Btn>
+            {saveStatus && <div style={{ marginTop: 7, fontSize: 11, color: saveStatus.startsWith('오류') ? '#791F1F' : '#085041', textAlign: 'center' }}>{saveStatus}</div>}
+          </div>
+        </div>
+      )}
 
       {loading && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text3)', fontSize: 13 }}><Spinner /> 불러오는 중...</div>}
 
       {!loading && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text3)', fontSize: 13, lineHeight: 1.8 }}>딜 없음.<br />Notion Deal Sheet에서 데이터를 확인해주세요.</div>
+        <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text3)', fontSize: 13, lineHeight: 1.8 }}>딜 없음.<br />위 '+ 딜 추가' 버튼으로 신규 딜을 등록하거나<br />Notion Deal Sheet에서 데이터를 확인해주세요.</div>
       )}
 
       {filtered.map(deal => (
