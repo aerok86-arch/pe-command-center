@@ -151,7 +151,7 @@ function NewsRadar() {
           )) : <span style={{ fontSize: 11, color: 'var(--text3)' }}>키워드 추가 또는 아래 섹터 선택</span>}
         </div>
         <div style={{ display: 'flex', gap: 7, marginBottom: 12 }}>
-          <input className="pe-input" style={{ flex: 1 }} value={kwInput} onChange={e => setKwInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addKw()} placeholder="키워드 직접 입력 (엔터)" />
+          <input className="pe-input" style={{ flex: 1 }} value={kwInput} onChange={e => setKwInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && addKw()} placeholder="키워드 직접 입력 (엔터)" />
           <Btn variant="secondary" onClick={addKw}>추가</Btn>
         </div>
         <div className="pe-divider" />
