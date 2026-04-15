@@ -25,6 +25,14 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim())
     return NextResponse.json(parsed)
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    const msg: string = e.message ?? ''
+    // 크레딧/한도 에러를 알기 쉽게 변환
+    if (e.status === 429 || msg.includes('credit') || msg.includes('quota') || msg.includes('billing') || msg.includes('insufficient')) {
+      return NextResponse.json({ error: 'API 크레딧이 부족합니다. console.anthropic.com → Billing에서 크레딧을 충전해주세요.' }, { status: 402 })
+    }
+    if (e.status === 401 || msg.includes('auth') || msg.includes('API key')) {
+      return NextResponse.json({ error: 'API 키가 유효하지 않습니다. Vercel 환경변수의 ANTHROPIC_API_KEY를 확인해주세요.' }, { status: 401 })
+    }
+    return NextResponse.json({ error: msg || '알 수 없는 오류가 발생했습니다.' }, { status: 500 })
   }
 }
