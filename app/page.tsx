@@ -2,6 +2,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 
+// iOS Safari에서 홈 화면에 추가 안 된 경우 감지
+function useIsInstallable() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isStandalone = ('standalone' in navigator) && (navigator as any).standalone === true
+    if (isIOS && !isStandalone) setShow(true)
+  }, [])
+  return show
+}
+
 // ── 타입 ──────────────────────────────────────────────────────
 type Tab = 'radar' | 'ideas' | 'pipeline'
 type NewsItem = { headline: string; summary: string; pe_implication: string; sentiment: string; sector_tags: string[]; urgency: string; source?: string; url?: string }
@@ -46,6 +57,8 @@ function Spinner() {
 export default function App() {
   const [tab, setTab] = useState<Tab>('radar')
   const { data: session } = useSession()
+  const showInstallBanner = useIsInstallable()
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 720, margin: '0 auto' }}>
@@ -70,10 +83,24 @@ export default function App() {
         .pe-stage-btn.sel { background: var(--accent-light); border-color: rgba(83,74,183,0.4); color: var(--accent); font-weight: 500; }
         .pe-save-box { background: var(--bg3); border-radius: 10px; padding: 12px 14px; }
         .pe-save-note { font-size: 11px; color: var(--text3); margin-bottom: 7px; }
+        /* iOS safe area 대응 */
+        .pe-topbar { padding-top: env(safe-area-inset-top); }
+        .pe-bottom-safe { padding-bottom: env(safe-area-inset-bottom); }
       `}</style>
 
-      {/* 탑바 */}
-      <div style={{ background: 'var(--bg2)', borderBottom: '0.5px solid var(--border)', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, flexShrink: 0 }}>
+      {/* iOS 홈 화면 추가 유도 배너 */}
+      {showInstallBanner && !bannerDismissed && (
+        <div style={{ background: '#534AB7', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
+          <div style={{ fontSize: 12, color: 'white', lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 600 }}>앱으로 설치하기</span>
+            <span style={{ opacity: 0.8 }}> — 하단 공유 버튼 → '홈 화면에 추가' 탭</span>
+          </div>
+          <button onClick={() => setBannerDismissed(true)} style={{ color: 'rgba(255,255,255,0.7)', background: 'transparent', border: 'none', fontSize: 16, padding: '0 4px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+        </div>
+      )}
+
+      {/* 탑바 — iOS safe area 대응 */}
+      <div className="pe-topbar" style={{ background: 'var(--bg2)', borderBottom: '0.5px solid var(--border)', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
           <span style={{ fontSize: 13, fontWeight: 600 }}>PE Command Center</span>

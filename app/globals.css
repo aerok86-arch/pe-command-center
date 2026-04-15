@@ -30,7 +30,10 @@
   }
 }
 
-html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+
+/* iOS PWA: 바운스 스크롤 방지, 텍스트 선택 최소화 */
+body { -webkit-overflow-scrolling: touch; touch-action: manipulation; }
 
 button { cursor: pointer; font-family: inherit; border: none; }
 input, textarea, select { font-family: inherit; }
