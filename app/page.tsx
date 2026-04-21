@@ -24,6 +24,15 @@ const STAGES = ['아이디어', '초기검토', '딜진행', '보류']
 const STATUS_COLORS: Record<string, string> = { 'On-going': '#1D9E75', 'Drop': '#888780', 'Closed': '#534AB7' }
 const SECTOR_COLORS: Record<string, string> = { 'AI반도체': '#3C3489', 'AI에이전트': '#712B13', '바이오': '#27500A', '방산': '#791F1F', '2차전지': '#633806', '로보틱스': '#085041', 'SaaS': '#0C447C', '데이터센터': '#444441', '소비재': '#3C3489' }
 
+function formatAmountEok(amountWon: number): string {
+  const eok = amountWon / 100_000_000
+  if (eok >= 10000) return `${Math.round(eok / 1000).toLocaleString('ko-KR')}천억`
+  if (eok >= 100) return `${Math.round(eok).toLocaleString('ko-KR')}억`
+  if (eok >= 1) return `${(Math.round(eok * 10) / 10).toLocaleString('ko-KR')}억`
+  const chun = amountWon / 10_000
+  return `${Math.round(chun).toLocaleString('ko-KR')}만원`
+}
+
 // ── 유틸 컴포넌트 ──────────────────────────────────────────────
 function Tag({ label, color = '#444', bg = '#f0eee8' }: { label: string; color?: string; bg?: string }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: bg, color }}>{label}</span>
@@ -591,7 +600,7 @@ function DealPipeline() {
             )}
             {deal.type.map(t => <Tag key={t} label={t} bg="#E6F1FB" color="#0C447C" />)}
             {deal.sourcingType && <Tag label={deal.sourcingType} bg="#FAEEDA" color="#633806" />}
-            {deal.amount && <Tag label={`${deal.amount.toLocaleString()}억`} bg="#F1EFE8" color="#444441" />}
+            {deal.amount != null && <Tag label={formatAmountEok(deal.amount)} bg="#F1EFE8" color="#444441" />}
           </div>
           {(deal.sourcer || deal.date) && (
             <div style={{ marginTop: 7, fontSize: 11, color: 'var(--text3)' }}>
