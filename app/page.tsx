@@ -17,7 +17,7 @@ function useIsInstallable() {
 type Tab = 'radar' | 'ideas' | 'pipeline'
 type NewsItem = { headline: string; summary: string; pe_implication: string; sentiment: string; sector_tags: string[]; urgency: string; source?: string; url?: string }
 type Idea = { id: string; title: string; sector: string; stage: string; ev: string; thesis: string; nextAction: string; date: string; url: string }
-type Deal = { id: string; name: string; status: string; amount: number | null; type: string[]; sourcingType: string; sourcer: string; date: string; url: string }
+type Deal = { id: string; name: string; status: string; amount: number | null; type: string[]; sourcingType: string; sourcer: string; date: string; involvementSourcing?: string; involvementValueUp?: string; involvementExit?: string; url: string }
 
 const SECTORS = ['AI반도체', 'AI에이전트', '바이오', '방산', '2차전지', '로보틱스', 'SaaS', '데이터센터', '소비재']
 const STAGES = ['아이디어', '초기검토', '딜진행', '보류']
@@ -463,7 +463,7 @@ function DealPipeline() {
         body: JSON.stringify({
           name: form.name,
           status: form.status,
-          amount: form.amount ? Number(form.amount) : null,
+          amount: form.amount ? Number(form.amount) * 100_000_000 : null,
           type: form.type,
           sourcingType: form.sourcingType,
           sourcer: form.sourcer,
@@ -589,26 +589,207 @@ function DealPipeline() {
       )}
 
       {filtered.map(deal => (
-        <div key={deal.id} className="pe-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 7 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{deal.name}</div>
-            <a href={deal.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 8, flexShrink: 0, opacity: 0.7 }}>Notion ↗</a>
-          </div>
-          <div className="pe-row" style={{ gap: 4 }}>
-            {deal.status && (
-              <Tag label={deal.status} bg={deal.status === 'On-going' ? '#E1F5EE' : deal.status === 'Drop' ? '#F1EFE8' : '#EEEDFE'} color={STATUS_COLORS[deal.status] ?? '#444'} />
-            )}
-            {deal.type.map(t => <Tag key={t} label={t} bg="#E6F1FB" color="#0C447C" />)}
-            {deal.sourcingType && <Tag label={deal.sourcingType} bg="#FAEEDA" color="#633806" />}
-            {deal.amount != null && <Tag label={formatAmountEok(deal.amount)} bg="#F1EFE8" color="#444441" />}
-          </div>
-          {(deal.sourcer || deal.date) && (
-            <div style={{ marginTop: 7, fontSize: 11, color: 'var(--text3)' }}>
-              {deal.sourcer && `소싱: ${deal.sourcer}`}{deal.sourcer && deal.date && ' · '}{deal.date}
-            </div>
-          )}
-        </div>
+        <DealCard key={deal.id} deal={deal} onUpdated={loadDeals} />
       ))}
+    </div>
+  )
+}
+
+function DealCard({ deal, onUpdated }: { deal: Deal; onUpdated: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [statusUpdating, setStatusUpdating] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('')
+
+  const buildFormFromDeal = (d: Deal) => ({
+    name: d.name,
+    status: d.status || 'On-going',
+    amount: d.amount != null ? String(d.amount / 100_000_000) : '',
+    type: d.type || [],
+    sourcingType: d.sourcingType || '',
+    sourcer: d.sourcer || '',
+    date: d.date || new Date().toISOString().slice(0, 10),
+    involvementSourcing: d.involvementSourcing || '',
+    involvementValueUp: d.involvementValueUp || '',
+    involvementExit: d.involvementExit || '',
+  })
+
+  const [form, setForm] = useState(() => buildFormFromDeal(deal))
+
+  useEffect(() => { if (!editing) setForm(buildFormFromDeal(deal)) }, [deal, editing])
+
+  const toggleType = (t: string) => setForm(p => ({
+    ...p,
+    type: p.type.includes(t) ? p.type.filter(x => x !== t) : [...p.type, t],
+  }))
+
+  const quickSetStatus = async (newStatus: string) => {
+    if (newStatus === deal.status || statusUpdating) return
+    setStatusUpdating(true)
+    try {
+      const r = await fetch('/api/deals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deal.id, status: newStatus }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      onUpdated()
+    } catch (e: any) { alert('상태 변경 실패: ' + e.message) }
+    finally { setStatusUpdating(false) }
+  }
+
+  const save = async () => {
+    if (!form.name.trim()) { alert('딜 이름을 입력해주세요.'); return }
+    setSaving(true); setSaveStatus('저장 중...')
+    try {
+      const r = await fetch('/api/deals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deal.id,
+          name: form.name,
+          status: form.status,
+          amount: form.amount ? Number(form.amount) * 100_000_000 : null,
+          type: form.type,
+          sourcingType: form.sourcingType,
+          sourcer: form.sourcer,
+          date: form.date,
+          involvementSourcing: form.involvementSourcing,
+          involvementValueUp: form.involvementValueUp,
+          involvementExit: form.involvementExit,
+        }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setSaveStatus('✓ 저장 완료')
+      setEditing(false)
+      onUpdated()
+      setTimeout(() => setSaveStatus(''), 2000)
+    } catch (e: any) { setSaveStatus('오류: ' + e.message) }
+    finally { setSaving(false) }
+  }
+
+  if (editing) {
+    return (
+      <div className="pe-card" style={{ border: '0.5px solid rgba(83,74,183,0.35)' }}>
+        <div className="pe-section" style={{ marginBottom: 11 }}>딜 편집</div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div className="pe-label">딜 이름 *</div>
+          <input className="pe-input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+        </div>
+
+        <div className="pe-grid2" style={{ marginBottom: 10 }}>
+          <div>
+            <div className="pe-label">딜 상태</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {DEAL_STATUSES.map(s => (
+                <button key={s} className={`pe-stage-btn${form.status === s ? ' sel' : ''}`} onClick={() => setForm(p => ({ ...p, status: s }))}>{s}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="pe-label">소싱구분</div>
+            <select className="pe-input" value={form.sourcingType} onChange={e => setForm(p => ({ ...p, sourcingType: e.target.value }))}>
+              <option value="">선택</option>
+              {SOURCING_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div className="pe-label">딜 구분 (복수 선택 가능)</div>
+          <div className="pe-row" style={{ gap: 5 }}>
+            {DEAL_TYPES.map(t => (
+              <div key={t} className={`pe-chip${form.type.includes(t) ? ' sel' : ''}`} style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => toggleType(t)}>{t}</div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pe-grid2" style={{ marginBottom: 10 }}>
+          <div>
+            <div className="pe-label">딜 금액 (억원)</div>
+            <input className="pe-input" type="number" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+          </div>
+          <div>
+            <div className="pe-label">소싱자</div>
+            <input className="pe-input" value={form.sourcer} onChange={e => setForm(p => ({ ...p, sourcer: e.target.value }))} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div className="pe-label">날짜</div>
+          <input className="pe-input" type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div className="pe-label">Involvement — 소싱</div>
+          <textarea className="pe-input" value={form.involvementSourcing} onChange={e => setForm(p => ({ ...p, involvementSourcing: e.target.value }))} placeholder="소싱 단계 관여 내용" />
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <div className="pe-label">Involvement — Value-up</div>
+          <textarea className="pe-input" value={form.involvementValueUp} onChange={e => setForm(p => ({ ...p, involvementValueUp: e.target.value }))} placeholder="Value-up 단계 관여 내용" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div className="pe-label">Involvement — Exit</div>
+          <textarea className="pe-input" value={form.involvementExit} onChange={e => setForm(p => ({ ...p, involvementExit: e.target.value }))} placeholder="Exit 단계 관여 내용" />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn onClick={save} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>
+            {saving ? <><Spinner /> 저장 중...</> : '💾 저장'}
+          </Btn>
+          <Btn variant="ghost" onClick={() => { setEditing(false); setForm(buildFormFromDeal(deal)) }} disabled={saving}>취소</Btn>
+        </div>
+        {saveStatus && <div style={{ marginTop: 7, fontSize: 11, color: saveStatus.startsWith('오류') ? '#791F1F' : '#085041', textAlign: 'center' }}>{saveStatus}</div>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="pe-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 7 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{deal.name}</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+          <button onClick={() => setEditing(true)} style={{ fontSize: 11, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>✏️ 편집</button>
+          <a href={deal.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--accent)', opacity: 0.7 }}>Notion ↗</a>
+        </div>
+      </div>
+
+      {/* 빠른 상태 변경 */}
+      <div className="pe-row" style={{ gap: 4, marginBottom: 6 }}>
+        {DEAL_STATUSES.map(s => {
+          const active = deal.status === s
+          return (
+            <button
+              key={s}
+              onClick={() => quickSetStatus(s)}
+              disabled={statusUpdating || active}
+              style={{
+                fontSize: 11, padding: '3px 9px', borderRadius: 99, cursor: active ? 'default' : 'pointer', fontFamily: 'inherit',
+                border: `0.5px solid ${active ? (STATUS_COLORS[s] ?? '#444') : 'var(--border2)'}`,
+                background: active ? (s === 'On-going' ? '#E1F5EE' : s === 'Drop' ? '#F1EFE8' : '#EEEDFE') : 'var(--bg2)',
+                color: active ? (STATUS_COLORS[s] ?? '#444') : 'var(--text3)',
+                fontWeight: active ? 600 : 400,
+                opacity: statusUpdating ? 0.5 : 1,
+              }}
+            >{s}</button>
+          )
+        })}
+        {statusUpdating && <Spinner />}
+      </div>
+
+      <div className="pe-row" style={{ gap: 4 }}>
+        {deal.type.map(t => <Tag key={t} label={t} bg="#E6F1FB" color="#0C447C" />)}
+        {deal.sourcingType && <Tag label={deal.sourcingType} bg="#FAEEDA" color="#633806" />}
+        {deal.amount != null && <Tag label={formatAmountEok(deal.amount)} bg="#F1EFE8" color="#444441" />}
+      </div>
+      {(deal.sourcer || deal.date) && (
+        <div style={{ marginTop: 7, fontSize: 11, color: 'var(--text3)' }}>
+          {deal.sourcer && `소싱: ${deal.sourcer}`}{deal.sourcer && deal.date && ' · '}{deal.date}
+        </div>
+      )}
     </div>
   )
 }

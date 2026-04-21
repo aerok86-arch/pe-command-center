@@ -29,26 +29,74 @@ export async function GET() {
   }
 }
 
+function buildProperties(body: any, partial: boolean): any {
+  const { name, status, amount, type, sourcingType, sourcer, date, involvementSourcing, involvementValueUp, involvementExit } = body
+  const p: any = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k)
+
+  if (!partial || has('name')) {
+    if (name != null) p['Deal 이름'] = { title: [{ text: { content: name } }] }
+  }
+  if (!partial || has('status')) {
+    p['Deal Status'] = status ? { select: { name: status } } : { select: null }
+  }
+  if (!partial || has('amount')) {
+    p['Deal Amount'] = { number: amount ?? null }
+  }
+  if (!partial || has('type')) {
+    p['Deal 구분'] = { multi_select: (type ?? []).map((t: string) => ({ name: t })) }
+  }
+  if (!partial || has('sourcingType')) {
+    p['소싱구분'] = sourcingType ? { select: { name: sourcingType } } : { select: null }
+  }
+  if (!partial || has('sourcer')) {
+    p['소싱자'] = { rich_text: sourcer ? [{ text: { content: sourcer } }] : [] }
+  }
+  if (!partial || has('date')) {
+    p['날짜'] = date ? { date: { start: date } } : { date: null }
+  }
+  if (has('involvementSourcing')) {
+    p['Involvement(Sourcing)'] = { rich_text: involvementSourcing ? [{ text: { content: involvementSourcing } }] : [] }
+  }
+  if (has('involvementValueUp')) {
+    p['Involvement(Value-up)'] = { rich_text: involvementValueUp ? [{ text: { content: involvementValueUp } }] : [] }
+  }
+  if (has('involvementExit')) {
+    p['Involvement(Exit)'] = { rich_text: involvementExit ? [{ text: { content: involvementExit } }] : [] }
+  }
+  return p
+}
+
 // POST: 신규 딜 저장
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { name, status, amount, type, sourcingType, sourcer, date } = body
+    if (!body.name) return NextResponse.json({ error: 'name required' }, { status: 400 })
 
     const page = await notion.pages.create({
       parent: { database_id: DEAL_SHEET_DB },
-      properties: {
-        'Deal 이름': { title: [{ text: { content: name } }] },
-        'Deal Status': status ? { select: { name: status } } : undefined,
-        'Deal Amount': amount != null ? { number: amount } : undefined,
-        'Deal 구분': type?.length ? { multi_select: type.map((t: string) => ({ name: t })) } : undefined,
-        '소싱구분': sourcingType ? { select: { name: sourcingType } } : undefined,
-        '소싱자': sourcer ? { rich_text: [{ text: { content: sourcer } }] } : undefined,
-        '날짜': date ? { date: { start: date } } : undefined,
-      } as any,
+      properties: buildProperties(body, false),
     })
 
     return NextResponse.json({ ok: true, id: page.id, url: (page as any).url })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
+// PATCH: 기존 딜 수정
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { id } = body
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    await notion.pages.update({
+      page_id: id,
+      properties: buildProperties(body, true),
+    })
+
+    return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
